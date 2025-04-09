@@ -25,7 +25,32 @@ library(curl)
 ## [1] Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your 𝛽 coeffiecients (slope and intercept).
 
 ```{r}
+#Load data
+kamilar_cooper <- curl("https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/refs/heads/master/AN588_Spring25/KamilarAndCooperData.csv")
 
+#fill in blank as N/A
+kamilar_cooper <- read.csv(kamilar_cooper, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+#show what the data looks like
+head(kamilar_cooper)
+```
+
+```{r}
+#Create new columns in the data set: log(HomeRange) and log(Body Mass)
+kamilar_cooper <- kamilar_cooper %>%
+  mutate(
+    log_HR = log(HomeRange_km2),
+    log_BM = log(Body_mass_female_mean)
+  ) 
+
+# Fit linear model: log(HomeRange) ~ log(Body Mass)
+lm_logHR_logBM <- lm(log_HR ~ log_BM, data = kamilar_cooper)
+
+# Show regression summary
+summary(lm_logHR_logBM)
+
+# Show specifically the beta values of intercept and slope
+coef(lm_logHR_logBM)
 ```
 
 ## [2] Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the same coefficients. This generates a sampling distribution for each 𝛽 coefficient.
