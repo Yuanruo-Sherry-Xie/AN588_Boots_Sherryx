@@ -202,4 +202,5 @@ ggplot(bootstrap_trace, aes(x = n_boot)) +
 
 ## 5 Struggles I Have Encountered Doing HW 5
 
-1.  
+1.  extra credit
+2.  extra extra credit
