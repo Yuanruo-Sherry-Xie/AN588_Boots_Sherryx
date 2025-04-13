@@ -1,0 +1,213 @@
+---
+title: "Sherryx_OriginalHomeworkCode_05"
+author: "Sherry Xie"
+date: "2025-04-08"
+output: html_document
+---
+
+## Set up
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#loading ggplot for the figures
+library(ggplot2)
+library(tidyverse)
+library(curl)
+
+
+#loading prettydoc for the theme
+#library(prettydoc)
+```
+
+## [1] Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your 𝛽 coeffiecients (slope and intercept).
+
+```{r}
+#Load data
+kamilar_cooper <- curl("https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/refs/heads/master/AN588_Spring25/KamilarAndCooperData.csv")
+
+#fill in blank as N/A
+kamilar_cooper <- read.csv(kamilar_cooper, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+
+#show what the data looks like
+head(kamilar_cooper)
+```
+
+```{r}
+#Create new columns in the data set: log(HomeRange) and log(Body Mass)
+kamilar_cooper <- kamilar_cooper %>%
+  mutate(
+    log_HR = log(HomeRange_km2),
+    log_BM = log(Body_mass_female_mean)
+  ) 
+
+# Fit linear model: log(HomeRange) ~ log(Body Mass)
+lm_logHR_logBM <- lm(log_HR ~ log_BM, data = kamilar_cooper)
+
+# Show regression summary
+summary(lm_logHR_logBM)
+
+# Show specifically the beta values of intercept and slope
+coef(lm_logHR_logBM)
+```
+
+## [2] Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the same coefficients. This generates a sampling distribution for each 𝛽 coefficient.
+
+### Estimate the standard error for each of your 𝛽 coefficients as the standard deviation of the sampling distribution from your bootstrap and determine the 95% CI for each of your 𝛽 coefficients based on the appropriate quantiles from your sampling distribution.
+
+```{r}
+# Set seed for reproducibility
+set.seed(2025)
+
+# Number of bootstrap replicates stated in the instructions 
+n_boot <- 1000
+
+# Prepare storage for coefficients
+boot_coefs <- matrix(NA, nrow = n_boot, ncol = 2)
+
+# Bootstrap loop
+for (i in 1:n_boot) {
+  sample_data <- kamilar_cooper[sample(1:nrow(kamilar_cooper), replace = TRUE), ]
+  model <- lm(log_HR ~ log_BM, data = sample_data)
+  boot_coefs[i, ] <- coef(model)
+}
+
+# Convert to dataframe so it will recoginze and run it 
+boot_coefs_df <- as.data.frame(boot_coefs)
+colnames(boot_coefs_df) <- c("Intercept", "Slope")
+```
+
+### How does the former compare to the SE estimated from your entire dataset using the formula for standard error implemented in `lm()`?
+
+```{r}
+# Estimate bootstrap standard errors
+boot_se <- apply(boot_coefs_df, 2, sd)
+boot_se
+```
+
+### How does the latter compare to the 95% CI estimated from your entire dataset?
+
+```{r}
+# Estimate 95% confidence intervals (2.5% and 97.5% quantiles)
+boot_ci <- apply(boot_coefs_df, 2, quantile, probs = c(0.025, 0.975))
+
+# Show results
+cat("Bootstrap Standard Errors:\n")
+print(round(boot_se, 4))
+
+cat("\nBootstrap 95% Confidence Intervals:\n")
+print(round(boot_ci, 4))
+
+```
+# T.Z: very clean code and understandable. I think for easier visibility and better understanding of the last two questions, I would like to see a dataframe when comparing the linear model based on dataset SE and 95% CI compared to the bootstrap SE, since I kept rerunning certain parts of a code to see the comparsion between the two.
+
+## EXTRA CREDIT: Write a FUNCTION that takes as its arguments a dataframe, “d”, a linear model, “m” (as a character string, e.g., “logHR\~logBM”), a user-defined confidence interval level, “conf.level” (with default = 0.95), and a number of bootstrap replicates, “n” (with default = 1000). Your function should return a dataframe that includes: beta coefficient names; beta coefficients, standard errors, and upper and lower CI limits for the linear model based on your entire dataset; and mean beta coefficient estimates, SEs, and CI limits for those coefficients based on your bootstrap.
+
+```{r}
+# Extra Credit Function
+bootstrap_lm_summary <- function(d, m, conf.level = 0.95, n = 1000) {
+  # Convert model string to formula
+  model_formula <- as.formula(m)
+  
+  # Fit model to full dataset
+  full_model <- lm(model_formula, data = d)
+  coef_names <- names(coef(full_model))
+  
+  # Extract model-based estimates, SEs, and CIs
+  full_estimates <- coef(full_model)
+  full_se <- summary(full_model)$coefficients[, "Std. Error"]
+  full_ci <- confint(full_model, level = conf.level)
+  
+  # Bootstrapping
+  set.seed(2025)
+  boot_coefs <- replicate(n, {
+    sample_rows <- d[sample(nrow(d), replace = TRUE), ]
+    coef(lm(model_formula, data = sample_rows))
+  })
+  
+  boot_coefs <- t(boot_coefs)
+  boot_mean <- apply(boot_coefs, 2, mean)
+  boot_se <- apply(boot_coefs, 2, sd)
+  boot_ci <- apply(boot_coefs, 2, quantile, probs = c((1 - conf.level)/2, 1 - (1 - conf.level)/2))
+  
+  # Combine everything into a summary dataframe
+  result_df <- data.frame(
+    Coefficient = coef_names,
+    FullModel_Estimate = round(full_estimates, 4),
+    FullModel_SE = round(full_se, 4),
+    FullModel_CI_Lower = round(full_ci[, 1], 4),
+    FullModel_CI_Upper = round(full_ci[, 2], 4),
+    Boot_Estimate = round(boot_mean, 4),
+    Boot_SE = round(boot_se, 4),
+    Boot_CI_Lower = round(boot_ci[1, ], 4),
+    Boot_CI_Upper = round(boot_ci[2, ], 4)
+  )
+  
+  return(result_df)
+}
+
+```
+
+# T.Z: Really liked that you used the replicate function instead of creating a for loop when creating this function because it allowed for a cleaner code.
+
+## EXTRA EXTRA CREDIT: Graph each beta value from the linear model and its corresponding mean value, lower CI and upper CI from a bootstrap as a function of number of bootstraps from 10 to 200 by 10s. HINT: the beta value from the linear model will be the same for all bootstraps and the mean beta value may not differ that much!
+
+```{r}
+# Create vector of bootstrap sizes from 10 to 200 by 10
+boot_sizes <- seq(10, 200, by = 10)
+
+# Empty dataframe to store results
+bootstrap_trace <- data.frame()
+
+# T.Z: I noticed that you rewrote the code to extract and graph the beta values from the linear model. I also noticed that using the function you created in the previous question bootstrap_lm_summary() would be really useful here instead of rewriting the code. By using your bootstrap_lm_summary() it will extract the values needed already and it can help simplify your code and make it even more efficient. 
+# Loop through each bootstrap size
+for (n in boot_sizes) {
+  set.seed(2025)  # Reproducibility
+  boot_coefs <- replicate(n, {
+    sample_data <- kamilar_cooper[sample(nrow(kamilar_cooper), replace = TRUE), ]
+    coef(lm(log_HR ~ log_BM, data = sample_data))
+  })
+  
+  # Transpose to match structure
+  boot_coefs <- t(boot_coefs)
+  
+  # Extract slope estimates
+  slope_vals <- boot_coefs[, "log_BM"]
+  
+  # Save mean and CI
+  bootstrap_trace <- rbind(bootstrap_trace, data.frame(
+    n_boot = n,
+    mean_slope = mean(slope_vals),
+    ci_lower = quantile(slope_vals, 0.025),
+    ci_upper = quantile(slope_vals, 0.975)
+  ))
+}
+
+# Original slope from the full model
+original_slope <- coef(lm_logHR_logBM)["log_BM"]
+
+# T.Z: you already loaded this in the beginning!
+# Plotting the results
+library(ggplot2)
+
+ggplot(bootstrap_trace, aes(x = n_boot)) +
+  geom_line(aes(y = mean_slope), color = "blue", size = 1.2) +
+  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), fill = "skyblue", alpha = 0.3) +
+  geom_hline(yintercept = original_slope, linetype = "dashed", color = "red") +
+  labs(
+    title = "Stability of Bootstrap Estimates for Slope (log_BM)",
+    subtitle = "With Increasing Number of Bootstrap Samples",
+    x = "Number of Bootstraps",
+    y = "Estimated Slope"
+  ) +
+  theme_minimal()
+```
+
+## 5 Struggles I Have Encountered Doing HW 5
+
+1.  extra credit
+2.  extra extra credit
+
+# T.Z: Really clean and well-organized code-great job! I think it would be even more helpful with a bit more explanation and interpretation of the results, so we are able to understand what the outputs mean. Also, since you wrote such a useful function in extra credit, reusing it in the extra extra credit would make your code even more efficient and concise. Overall, this code is very neat, not much to change!
