@@ -2,7 +2,11 @@
 title: "Sherryx_FinalHomeworkCode_05"
 author: "Sherry Xie"
 date: "2025-04-14"
-output: html_document
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: true
 ---
 
 ## Set up
@@ -19,7 +23,7 @@ library(curl)
 
 
 #loading prettydoc for the theme
-#library(prettydoc)
+library(prettydoc)
 ```
 
 ## [1] Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your 𝛽 coeffiecients (slope and intercept).
@@ -90,15 +94,36 @@ boot_se
 ### How does the latter compare to the 95% CI estimated from your entire dataset?
 
 ```{r}
+#ORIGINAL CODE
 # Estimate 95% confidence intervals (2.5% and 97.5% quantiles)
-boot_ci <- apply(boot_coefs_df, 2, quantile, probs = c(0.025, 0.975))
+#boot_ci <- apply(boot_coefs_df, 2, quantile, probs = c(0.025, 0.975))
 
 # Show results
-cat("Bootstrap Standard Errors:\n")
-print(round(boot_se, 4))
+#cat("Bootstrap Standard Errors:\n")
+#print(round(boot_se, 4))
 
-cat("\nBootstrap 95% Confidence Intervals:\n")
-print(round(boot_ci, 4))
+#cat("\nBootstrap 95% Confidence Intervals:\n")
+#print(round(boot_ci, 4))
+
+#T.Z: very clean code and understandable. I think for easier visibility and better understanding of the last two questions, I would like to see a dataframe when comparing the linear model based on dataset SE and 95% CI compared to the bootstrap SE, since I kept rerunning certain parts of a code to see the comparsion between the two.
+
+#UPDATED CODE
+# Linear model-based SEs and CIs
+lm_summary <- summary(lm_logHR_logBM)
+lm_se <- lm_summary$coefficients[, "Std. Error"]
+lm_ci <- confint(lm_logHR_logBM)
+
+# Combine into one table
+comparison_df <- data.frame(
+  Coefficient = c("Intercept", "Slope"),
+  Model_SE = round(lm_se, 4),
+  Model_CI_Lower = round(lm_ci[,1], 4),
+  Model_CI_Upper = round(lm_ci[,2], 4),
+  Bootstrap_SE = round(boot_se, 4),
+  Bootstrap_CI_Lower = round(boot_ci[1,], 4),
+  Bootstrap_CI_Upper = round(boot_ci[2,], 4)
+)
+print(comparison_df)
 
 ```
 
@@ -147,6 +172,8 @@ bootstrap_lm_summary <- function(d, m, conf.level = 0.95, n = 1000) {
   return(result_df)
 }
 
+
+#T.Z: Really liked that you used the replicate function instead of creating a for loop when creating this function because it allowed for a cleaner code.
 ```
 
 ## EXTRA EXTRA CREDIT: Graph each beta value from the linear model and its corresponding mean value, lower CI and upper CI from a bootstrap as a function of number of bootstraps from 10 to 200 by 10s. HINT: the beta value from the linear model will be the same for all bootstraps and the mean beta value may not differ that much!
@@ -158,32 +185,22 @@ boot_sizes <- seq(10, 200, by = 10)
 # Empty dataframe to store results
 bootstrap_trace <- data.frame()
 
-# Loop through each bootstrap size
 for (n in boot_sizes) {
-  set.seed(2025)  # Reproducibility
-  boot_coefs <- replicate(n, {
-    sample_data <- kamilar_cooper[sample(nrow(kamilar_cooper), replace = TRUE), ]
-    coef(lm(log_HR ~ log_BM, data = sample_data))
-  })
+  result <- bootstrap_lm_summary(kamilar_cooper, "log_HR ~ log_BM", n = n)
+  slope_row <- result[result$Coefficient == "log_BM", ]
   
-  # Transpose to match structure
-  boot_coefs <- t(boot_coefs)
-  
-  # Extract slope estimates
-  slope_vals <- boot_coefs[, "log_BM"]
-  
-  # Save mean and CI
   bootstrap_trace <- rbind(bootstrap_trace, data.frame(
     n_boot = n,
-    mean_slope = mean(slope_vals),
-    ci_lower = quantile(slope_vals, 0.025),
-    ci_upper = quantile(slope_vals, 0.975)
+    mean_slope = slope_row$Boot_Estimate,
+    ci_lower = slope_row$Boot_CI_Lower,
+    ci_upper = slope_row$Boot_CI_Upper
   ))
 }
 
 # Original slope from the full model
 original_slope <- coef(lm_logHR_logBM)["log_BM"]
 
+# T.Z: you already loaded this in the beginning!
 # Plotting the results
 library(ggplot2)
 
@@ -204,3 +221,4 @@ ggplot(bootstrap_trace, aes(x = n_boot)) +
 
 1.  extra credit
 2.  extra extra credit
+3.  
