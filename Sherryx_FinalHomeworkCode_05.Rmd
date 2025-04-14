@@ -89,24 +89,16 @@ colnames(boot_coefs_df) <- c("Intercept", "Slope")
 # Estimate bootstrap standard errors
 boot_se <- apply(boot_coefs_df, 2, sd)
 boot_se
+
+# Estimate 95% confidence intervals from bootstrap
+boot_ci <- apply(boot_coefs_df, 2, quantile, probs = c(0.025, 0.975))
+boot_ci
+
 ```
 
 ### How does the latter compare to the 95% CI estimated from your entire dataset?
 
 ```{r}
-#ORIGINAL CODE
-# Estimate 95% confidence intervals (2.5% and 97.5% quantiles)
-#boot_ci <- apply(boot_coefs_df, 2, quantile, probs = c(0.025, 0.975))
-
-# Show results
-#cat("Bootstrap Standard Errors:\n")
-#print(round(boot_se, 4))
-
-#cat("\nBootstrap 95% Confidence Intervals:\n")
-#print(round(boot_ci, 4))
-
-#T.Z: very clean code and understandable. I think for easier visibility and better understanding of the last two questions, I would like to see a dataframe when comparing the linear model based on dataset SE and 95% CI compared to the bootstrap SE, since I kept rerunning certain parts of a code to see the comparsion between the two.
-
 #UPDATED CODE
 # Linear model-based SEs and CIs
 lm_summary <- summary(lm_logHR_logBM)
